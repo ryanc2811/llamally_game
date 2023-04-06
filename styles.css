@@ -1,0 +1,47 @@
+
+
+
+/* Default styles for the game canvas */
+#gameCanvas {
+    display: block;
+    margin: 0 auto;
+    background-color: white;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Styles for desktop */
+  @media (min-width: 768px) {
+    #gameCanvas {
+      border: 2px solid black; /* Add a border */
+      margin: auto; /* Center the canvas horizontally */
+      width: 800px; /* Set a fixed width */
+      
+    }
+
+   
+    
+  }
+  canvas {
+    display: block;
+    margin: 0 auto;
+  }
+  .content {
+    max-width: 100%;
+    max-height: 100%;
+    margin: 0 auto;
+    overflow: hidden;
+  }
+  html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+  
+  /* Media query for small screens (e.g., mobile devices) */
+  @media only screen and (max-width: 768px) {
+    #gameCanvas {
+      height: auto; /* Subtract the height of the score element */
+      width:100%;
+    }
+  }
