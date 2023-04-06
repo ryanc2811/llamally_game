@@ -11,7 +11,7 @@ Llama Leap is a fun, engaging, and addictive game where players help an intellig
 - Floating knowledge tokens (e.g., subjects like math, science, languages) appear throughout each level. Players collect these tokens to increase their score.
 - Various power-ups (e.g., double points, shield, slow time) spawn randomly to enhance the gameplay and help players reach higher scores.
 - The game becomes progressively more challenging as the speed increases and obstacles become more complex.
-- Players can unlock new levels or llama characters with collected knowledge tokens, adding an element of progression.
+
 
 ## Features
 
