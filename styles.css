@@ -14,11 +14,13 @@
     #gameCanvas {
       border: 2px solid black; /* Add a border */
       margin: auto; /* Center the canvas horizontally */
-      width: 800px; /* Set a fixed width */
-      
+      width: 45%; /* Set a fixed width */
+      height: 45%;
     }
 
-   
+   .content{
+    padding: 20px;
+   }
     
   }
   canvas {

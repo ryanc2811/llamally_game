@@ -3,6 +3,8 @@ import Obstacle from './Obstacle.js';
 import Token from './Token.js';
 import PowerUp from './PowerUp.js';
 import ObjectPool from './ObjectPool.js';
+// Import the Shield class at the top of the file
+import Shield from './Shield.js';
 
 const canvas = document.getElementById('gameCanvas');
 
@@ -10,7 +12,7 @@ const ctx = canvas.getContext('2d');
 let lastTime = 0; // store the last time the game loop was run
 let deltaTime = 0; // store the time since the last game loop run
 
-let timeElapsed = 0;
+let canRestart = false;
 
 let spawnRate = 0.2;
 let spawnTimer = 0;
@@ -31,26 +33,64 @@ let doublePointsActive = false;
 let doublePointsTimer = 0;
 const DOUBLE_POINTS_DURATION = 5; // 5 seconds
 
-let shieldActive = false;
-let shieldTimer = 0;
-const SHIELD_DURATION = 5; // 5 seconds
+const GameState = {
+  PAUSED: 'paused',
+  PLAYING: 'playing',
+  GAME_OVER: 'gameOver',
+};
+let gameState = GameState.PLAYING;
 
-setCanvasSize();
+let llama;
+
+
 
 window.addEventListener('resize', () => {
   setCanvasSize();
 });
+
 function setCanvasSize() {
   const width = window.innerWidth;
   const height = window.innerHeight;
-  canvas.width = width < 768 ? width : 600;
-  canvas.height = height < 768 ? height : 400;
+  const aspectRatio = width / height;
+
+  if (aspectRatio > 1) {
+    // Landscape or wide screens
+    canvas.width = 600;
+    canvas.height = 400;
+  } else {
+    // Portrait or narrow screens
+    canvas.width = width < 768 ? width : 400;
+    canvas.height = height < 768 ? height : height;
+  }
+
   if (width >= 768 && height >= 600) {
     canvas.height = 600;
   }
+
+  // Update the llama's position
+  if (llama) {
+    llama.x = (canvas.width / 2) - (llama.width / 2);
+    //llama.y = (canvas.height / 2) - (llama.height / 2);
+  }
 }
 
-let llama = new Llama(canvas.width / 2, canvas.height / 2, 61, 71, canvas);
+
+function handleDOMContentLoaded() {
+  setCanvasSize();
+  window.addEventListener('resize', setCanvasSize);
+
+  // Initialize the llama object after setting the canvas size
+  llama = new Llama(canvas.width / 2, canvas.height / 2, 61, 71, canvas);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', handleDOMContentLoaded);
+} else {
+  handleDOMContentLoaded();
+}
+
+// Create a shield instance after creating the llama instance
+let shield = new Shield(0, 0, 40, canvas);
 
 let obstacles = [];
 let knowledgeTokens = [];
@@ -59,23 +99,45 @@ let score = 0;
 
 const objectPool = new ObjectPool();
 
+let startTime = 0;
+
+let gameOverTime = 0;
+
 function gameLoop(currentTime) {
-  // calculate the time since the last frame
-  deltaTime = (currentTime - lastTime) / 1000;
+  if (gameState === GameState.PAUSED) {
+    lastTime = currentTime; // Reset lastTime to avoid a large deltaTime value
+    requestAnimationFrame(gameLoop);
+    return;
+  }
 
-  // update the game based on elapsed time
-  update(deltaTime);
+  if (gameState === GameState.PLAYING) {
+    if (startTime === 0) {
+      startTime = currentTime; // Set the starting time of the game
+    }
+    deltaTime = (currentTime - lastTime) / 1000;
 
-  // clear the canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+    console.log(gameState + ' ' + gameDifficulty);
+    update(deltaTime);
+    // clear the canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // draw the objects in the game
+    draw();
+  }
 
-  // draw the objects in the game
-  draw();
+  if (gameState === GameState.GAME_OVER) {
+    clearObjects();
+    gameOverTime = currentTime; // Set the game over time
+    showGameOverScreen();
+    console.log(gameState + ' ' + gameDifficulty);
+  }
 
-  // request the next animation frame
-  lastTime = currentTime;
+  lastTime = currentTime; // Update lastTime
   requestAnimationFrame(gameLoop);
 }
+
+
+
+
 requestAnimationFrame(gameLoop);
 function draw() {
 
@@ -83,22 +145,24 @@ function draw() {
   drawObstacles();
   drawKnowledgeTokens();
   drawPowerUps();
-
+  drawShield();
   drawScore();
 }
 
 function update(deltaTime) {
+
+  if (gameState !== GameState.PLAYING) {
+    return;
+  }
   updateLlama(deltaTime);
   updateObstacles(deltaTime);
   updateKnowledgeTokens(deltaTime);
   updatePowerUps(deltaTime);
   updateScore();
   checkCollisions();
-  timeElapsed += deltaTime;
+  updateShield(deltaTime, llama);
   // update the difficulty based on the elapsed time
   updateDifficulty(deltaTime);
-
-  console.log(canvas.height);
 
   // Update double points power-up timer
   if (doublePointsActive) {
@@ -106,16 +170,6 @@ function update(deltaTime) {
     if (doublePointsTimer >= DOUBLE_POINTS_DURATION) {
       doublePointsActive = false;
       doublePointsTimer = 0;
-    }
-  }
-
-
-  // Update shield power-up timer
-  if (shieldActive) {
-    shieldTimer += deltaTime;
-    if (shieldTimer >= SHIELD_DURATION) {
-      shieldActive = false;
-      shieldTimer = 0;
     }
   }
 
@@ -130,6 +184,14 @@ function update(deltaTime) {
 
 }
 
+function togglePause() {
+  if (gameState === GameState.GAME_OVER) return;
+  if (gameState === GameState.PLAYING) {
+    gameState = GameState.PAUSED;
+  } else {
+    gameState = GameState.PLAYING;
+  }
+}
 
 function updateLlama(deltaTime) {
   llama.update(deltaTime);
@@ -139,26 +201,18 @@ function drawScore() {
   ctx.font = "20px Arial";
   ctx.fillStyle = "black";
   if (doublePointsActive) {
-    ctx.fillText(`Score: ${Math.floor(score)} X2`, 10, 30); // Draw the score on the canvas
+    ctx.fillText(`Score: ${Math.ceil(score)} X2`, 10, 30); // Draw the score on the canvas
   } else {
-    ctx.fillText(`Score: ${Math.floor(score)}`, 10, 30); // Draw the score on the canvas
+    ctx.fillText(`Score: ${Math.ceil(score)}`, 10, 30); // Draw the score on the canvas
   }
 
 }
 function drawLlama() {
-  if (shieldActive) {
-    llama.draw(ctx, 'blue');
-  } else {
-    llama.draw(ctx, 'lime');
-  }
+  llama.draw(ctx)
 
 }
-function resetGame() {
-  // Reset the llama's position and velocity
-  llama.x = canvas.width / 2;
-  llama.y = canvas.height / 2;
-  llama.velocityY = 0;
 
+function clearObjects() {
   // Clear all obstacles, knowledge tokens, and power-ups
   obstacles.forEach((obstacle) => objectPool.release(obstacle));
   knowledgeTokens.forEach((token) => objectPool.release(token));
@@ -169,15 +223,32 @@ function resetGame() {
   powerUps = [];
 
   objectPool.reset();
+}
+function resetGame(currentTime) {
+
+  // Reset the llama's position and velocity
+  llama.x = (canvas.width / 2) - (llama.width / 2);
+  llama.y = canvas.height / 2;
+  llama.velocityY = 0;
+  clearObjects();
+
   spawnTimer = 0;
 
   gameDifficulty = 1;
+  console.log('gameDifficulty reset to: ' + gameDifficulty);
   spawnRate = 1;
   // Reset the score
   score = 0;
+
+  lastTime = currentTime; // store the last time the game loop was run
+  deltaTime = 0; // store the time since the last game loop run
+  timeSinceLastDifficultyIncrease = 0;
+
 }
 
 function updateObstacles(deltaTime) {
+
+
   // spawn new obstacles based on spawn rate
   spawnTimer += deltaTime;
   if (spawnTimer >= SPAWN_INTERVAL) {
@@ -211,15 +282,27 @@ function updateObstacles(deltaTime) {
     }
     return true;
   });
+
+
 }
 
-function updateDifficulty() {
+function updateShield(deltaTime, llama) {
+  shield.update(deltaTime, llama);
+}
+// Draw the shield in the draw() function
+function drawShield() {
+  shield.draw(ctx);
+}
+function updateDifficulty(deltaTime) {
+  console.log("On UPDATE" + gameDifficulty);
+
   timeSinceLastDifficultyIncrease += deltaTime;
   if (timeSinceLastDifficultyIncrease >= difficultyIncreaseInterval) {
     gameDifficulty += difficultyIncreaseAmount;
     timeSinceLastDifficultyIncrease -= difficultyIncreaseInterval;
   }
 }
+
 function drawObstacles() {
 
   obstacles.forEach((obstacle) => obstacle.draw(ctx));
@@ -316,8 +399,7 @@ function checkCollisions() {
         doublePointsTimer = 0;
       } else if (powerUp.type === 'shield') {
         console.log('Shield power-up collected');
-        shieldActive = true;
-        shieldTimer = 0;
+        shield.activate(); // Activate the shield for 5 seconds
       }
 
       // Remove the power-up from the array and release it back to the object pool
@@ -329,19 +411,32 @@ function checkCollisions() {
   obstacles.forEach((obstacle) => {
     if (llama.collidesWith(obstacle)) {
       console.log('Collision with obstacle!');
-      if (shieldActive) {
+      if (shield.active) {
         // If the shield is active, just remove the obstacle and deactivate the shield
         objectPool.release(obstacle);
         obstacles.splice(obstacles.indexOf(obstacle), 1);
-        shieldActive = false;
+        shield.deactivate()
       } else {
-        resetGame();
+        // If the shield is active, just remove the obstacle and deactivate the shield
+        objectPool.release(obstacle);
+        obstacles.splice(obstacles.indexOf(obstacle), 1);
+        // Set the game state to GAME_OVER instead of calling resetGame()
+        updateHighScore(Math.floor(score));
+        gameState = GameState.GAME_OVER;
       }
     }
   });
 }
-
-
+function getHighScore() {
+  const highScore = localStorage.getItem('highScore');
+  return highScore ? parseInt(highScore) : 0;
+}
+function updateHighScore(newScore) {
+  const currentHighScore = getHighScore();
+  if (newScore > currentHighScore) {
+    localStorage.setItem('highScore', newScore);
+  }
+}
 
 function updateScore() {
   // Increment the score based on elapsed time (e.g., every second)
@@ -350,14 +445,75 @@ function updateScore() {
   } else {
     score += 0.1;
   }
+
 }
 
+document.addEventListener('visibilitychange', () => {
+  togglePause();
+});
 
 canvas.addEventListener('mousedown', jump);
 canvas.addEventListener('touchstart', jump);
 
-function jump(event) {
+canvas.addEventListener('click', handleCanvasClick);
+canvas.addEventListener('touchstart', handleCanvasClick);
 
-  llama.jump();
+function handleCanvasClick() {
+  if (gameState === GameState.GAME_OVER && canRestart) {
+    gameState = GameState.PLAYING;
+    resetGame(lastTime);
+    canRestart = false; // Reset the canRestart flag
+
+  }
 }
 
+function jump(event) {
+  if (gameState === GameState.PLAYING) {
+    llama.jump();
+  }
+}
+
+function showGameOverScreen() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = 'white';
+  ctx.font = '48px Arial';
+  const gameOverText = 'Game Over';
+  const gameOverTextWidth = ctx.measureText(gameOverText).width;
+  ctx.fillText(gameOverText, (canvas.width / 2) - (gameOverTextWidth / 2), canvas.height / 2 - 100);
+
+  ctx.font = '24px Arial';
+  const restartText = 'Click to restart';
+  const restartTextWidth = ctx.measureText(restartText).width;
+  ctx.fillText(restartText, (canvas.width / 2) - (restartTextWidth / 2), canvas.height / 2 + 100);
+
+  ctx.font = '32px Arial';
+  const highScoreText = `High Score: ${getHighScore()}`;
+  const highScoreTextWidth = ctx.measureText(highScoreText).width;
+  ctx.fillText(highScoreText, (canvas.width / 2) - (highScoreTextWidth / 2), canvas.height / 2 - 30);
+
+  ctx.font = '32px Arial';
+  const scoreText = `Score: ${Math.floor(score)}`;
+  const scoreTextWidth = ctx.measureText(scoreText).width;
+  ctx.fillText(scoreText, (canvas.width / 2) - (scoreTextWidth / 2), canvas.height / 2 + 30);
+
+  setTimeout(() => {
+    canRestart = true;
+  }, 1500);
+
+
+}
+
+
+
+
+canvas.addEventListener('click', () => {
+  if (gameState === GameState.GAME_OVER && canRestart) {
+    gameState = GameState.PLAYING;
+    resetGame();
+    canRestart = false; // Reset the canRestart flag
+    //requestAnimationFrame(gameLoop);
+
+  }
+});

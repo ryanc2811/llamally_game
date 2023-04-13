@@ -31,6 +31,14 @@ export default class GameObject {
     );
   }
 
+  setImg(name) {
+    this.img = new Image(); // Add an img property
+    this.img.addEventListener('load', () => {
+      // Preserve the aspect ratio of the image
+      this.width = this.height * (this.img.width / this.img.height);
+    });
+    this.img.src = './' + name + '.png'; // Set the src property to the path of the PNG file
+  }
   reset() {
     this.x = 0;
     this.y = 0;

@@ -7,11 +7,13 @@ export default class Llama extends GameObject {
     this.jumpForce = -6;
     this.gravity = 0.2;
     this.velocityY = 0;
+
     this.img = new Image(); // Add an img property
     this.img.addEventListener('load', () => {
       // Preserve the aspect ratio of the image
       this.width = this.height * (this.img.width / this.img.height);
     });
+    this.x -= this.width / 2;
     this.img.src = './llama.png'; // Set the src property to the path of the llama PNG file
     this.update(); // Call update() in the constructor
   }
@@ -35,7 +37,8 @@ export default class Llama extends GameObject {
     this.velocityY = this.jumpForce;
   }
 
-  draw(ctx, color) {
+
+  draw(ctx) {
     //ctx.fillStyle = color;
     // Draw the llama image instead of a rectangle
     ctx.drawImage(this.img, this.x, this.y, this.width, this.height);

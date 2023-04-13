@@ -25,6 +25,7 @@ Llama Leap is a fun, engaging, and addictive game where players help an intellig
 ## Getting Started
 
 To run the game locally, follow these steps:
+http-server
 
 ### Prerequisites
 
