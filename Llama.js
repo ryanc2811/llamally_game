@@ -13,7 +13,7 @@ export default class Llama extends GameObject {
       // Preserve the aspect ratio of the image
       this.width = this.height * (this.img.width / this.img.height);
     });
-    this.x -= this.width / 2;
+
     this.img.src = './llama.png'; // Set the src property to the path of the llama PNG file
     this.update(); // Call update() in the constructor
   }
@@ -31,6 +31,7 @@ export default class Llama extends GameObject {
       this.y = this.canvas.height - this.height;
       this.velocityY = 0;
     }
+
   }
 
   jump() {

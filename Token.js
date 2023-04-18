@@ -4,6 +4,13 @@ export default class Token extends GameObject {
   constructor(x, y, width, height) {
     super(x, y, width, height);
     this.speed = 2;
+    this.img = new Image(); // Add an img property
+    this.img.addEventListener('load', () => {
+      // Preserve the aspect ratio of the image
+      this.width = this.height * (this.img.width / this.img.height);
+    });
+
+    this.img.src = './token.png'; // Set the src property to the path of the llama PNG file
   }
 
   update() {
@@ -11,9 +18,6 @@ export default class Token extends GameObject {
   }
 
   draw(ctx) {
-    ctx.fillStyle = 'gold';
-    ctx.beginPath();
-    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 2, 0, 2 * Math.PI);
-    ctx.fill();
+    ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
   }
 }

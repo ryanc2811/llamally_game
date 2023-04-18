@@ -10,6 +10,14 @@ export default class Shield extends GameObject {
 
         this.shieldTimer = 0;
         this.SHIELD_DURATION = 5; // 5 seconds
+
+        this.img = new Image(); // Add an img property
+        this.img.addEventListener('load', () => {
+            // Preserve the aspect ratio of the image
+            this.width = this.height * (this.img.width / this.img.height);
+        });
+
+        this.img.src = './bubble.png'; // Set the src property to the path of the llama PNG file
     }
 
     activate() {
@@ -38,11 +46,7 @@ export default class Shield extends GameObject {
 
     draw(ctx) {
         if (this.active) {
-            ctx.strokeStyle = 'blue';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(this.x + this.radius, this.y + this.radius, this.radius, 0, 2 * Math.PI);
-            ctx.stroke();
+            ctx.drawImage(this.img, this.x, this.y, this.width, this.height);
         }
     }
 }

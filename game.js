@@ -14,6 +14,8 @@ let deltaTime = 0; // store the time since the last game loop run
 
 let canRestart = false;
 
+const powerUpTypes = ['slow_time', 'double_points', 'shield', 'magnet'];
+
 let spawnRate = 0.2;
 let spawnTimer = 0;
 const SPAWN_INTERVAL = 0.1 / spawnRate;
@@ -33,6 +35,12 @@ let doublePointsActive = false;
 let doublePointsTimer = 0;
 const DOUBLE_POINTS_DURATION = 5; // 5 seconds
 
+const MAGNET_DURATION = 10;
+let magnetActive = false;
+let magnetTimer = 0;
+const ATTRACTION_RANGE = 100;
+const ATTRACTION_STRENGTH = 1000; // Increase this value to make the attraction stronger
+
 const GameState = {
   PAUSED: 'paused',
   PLAYING: 'playing',
@@ -40,9 +48,7 @@ const GameState = {
 };
 let gameState = GameState.PLAYING;
 
-let llama;
-
-
+let llama = new Llama(canvas.width / 2, canvas.height / 2, 62.5, 90.75, canvas);
 
 window.addEventListener('resize', () => {
   setCanvasSize();
@@ -73,24 +79,9 @@ function setCanvasSize() {
     //llama.y = (canvas.height / 2) - (llama.height / 2);
   }
 }
-
-
-function handleDOMContentLoaded() {
-  setCanvasSize();
-  window.addEventListener('resize', setCanvasSize);
-
-  // Initialize the llama object after setting the canvas size
-  llama = new Llama(canvas.width / 2, canvas.height / 2, 61, 71, canvas);
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', handleDOMContentLoaded);
-} else {
-  handleDOMContentLoaded();
-}
-
+setCanvasSize();
 // Create a shield instance after creating the llama instance
-let shield = new Shield(0, 0, 40, canvas);
+let shield = new Shield(0, 0, 50, canvas);
 
 let obstacles = [];
 let knowledgeTokens = [];
@@ -116,7 +107,6 @@ function gameLoop(currentTime) {
     }
     deltaTime = (currentTime - lastTime) / 1000;
 
-    console.log(gameState + ' ' + gameDifficulty);
     update(deltaTime);
     // clear the canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -135,9 +125,6 @@ function gameLoop(currentTime) {
   requestAnimationFrame(gameLoop);
 }
 
-
-
-
 requestAnimationFrame(gameLoop);
 function draw() {
 
@@ -147,6 +134,15 @@ function draw() {
   drawPowerUps();
   drawShield();
   drawScore();
+
+  /* const llamaCenterX = llama.x + llama.width / 2;
+  const llamaCenterY = llama.y + llama.height / 2;
+  // Draw the attraction range for testing purposes
+  ctx.beginPath();
+  ctx.arc(llamaCenterX, llamaCenterY, ATTRACTION_RANGE, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+  ctx.stroke();
+  ctx.closePath(); */
 }
 
 function update(deltaTime) {
@@ -158,6 +154,9 @@ function update(deltaTime) {
   updateObstacles(deltaTime);
   updateKnowledgeTokens(deltaTime);
   updatePowerUps(deltaTime);
+  // Add the lines below
+  attractObjects(knowledgeTokens, deltaTime);
+  attractObjects(powerUps, deltaTime);
   updateScore();
   checkCollisions();
   updateShield(deltaTime, llama);
@@ -182,7 +181,44 @@ function update(deltaTime) {
     }
   }
 
+  // Update double points power-up timer
+  if (magnetActive) {
+    magnetTimer += deltaTime;
+    if (magnetTimer >= MAGNET_DURATION) {
+      magnetActive = false;
+      magnetTimer = 0;
+    }
+  }
+
 }
+
+function attractObjects(objects, deltaTime) {
+  objects.forEach((obj) => {
+    const llamaCenterX = llama.x + llama.width / 2;
+    const llamaCenterY = llama.y + llama.height / 2;
+
+    const dx = llamaCenterX - obj.x;
+    const dy = llamaCenterY - obj.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    let attractionRange = ATTRACTION_RANGE;
+    let attractionStrength = ATTRACTION_STRENGTH;
+
+    if (magnetActive) {
+      attractionRange *= 2;
+      attractionStrength *= 2;
+    }
+    if (distance < attractionRange) {
+      const attractionForce = ((attractionRange - distance) / attractionRange) * attractionStrength;
+      const ax = (dx / distance) * attractionForce;
+      const ay = (dy / distance) * attractionForce;
+
+      obj.x += ax * deltaTime;
+      obj.y += ay * deltaTime;
+      console.log("Pulling");
+    }
+  });
+}
+
 
 function togglePause() {
   if (gameState === GameState.GAME_OVER) return;
@@ -235,7 +271,6 @@ function resetGame(currentTime) {
   spawnTimer = 0;
 
   gameDifficulty = 1;
-  console.log('gameDifficulty reset to: ' + gameDifficulty);
   spawnRate = 1;
   // Reset the score
   score = 0;
@@ -294,7 +329,6 @@ function drawShield() {
   shield.draw(ctx);
 }
 function updateDifficulty(deltaTime) {
-  console.log("On UPDATE" + gameDifficulty);
 
   timeSinceLastDifficultyIncrease += deltaTime;
   if (timeSinceLastDifficultyIncrease >= difficultyIncreaseInterval) {
@@ -316,13 +350,13 @@ function getObstacleSpawnProbability(deltaTime) {
   return Math.min(spawnProbability * deltaTime, maxSpawnProbability);
 }
 
-function updateKnowledgeTokens() {
+function updateKnowledgeTokens(deltaTime) {
   if (Math.random() < 0.005) {
     const token = objectPool.get(Token);
     token.x = canvas.width;
     token.y = Math.random() * (canvas.height - 10);
-    token.width = 25;
-    token.height = 25;
+    token.width = 50;
+    token.height = 50;
     knowledgeTokens.push(token);
   }
 
@@ -339,15 +373,14 @@ function drawKnowledgeTokens() {
   knowledgeTokens.forEach((token) => token.draw(ctx));
 }
 
-function updatePowerUps() {
+function updatePowerUps(deltaTime) {
   if (Math.random() < 0.002) {
     const powerUp = objectPool.get(PowerUp);
     powerUp.x = canvas.width;
     powerUp.y = Math.random() * (canvas.height - 20);
-    powerUp.width = 20;
-    powerUp.height = 20;
+    powerUp.width = 50;
+    powerUp.height = 50;
 
-    const powerUpTypes = ['slow_time', 'double_points', 'shield'];
     const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
     powerUp.setType(randomType);
 
@@ -400,6 +433,9 @@ function checkCollisions() {
       } else if (powerUp.type === 'shield') {
         console.log('Shield power-up collected');
         shield.activate(); // Activate the shield for 5 seconds
+      } else if (powerUp.type === 'magnet') {
+        console.log('Magnet power-up collected')
+        magnetActive = true;
       }
 
       // Remove the power-up from the array and release it back to the object pool
