@@ -3,12 +3,11 @@ import Obstacle from './Obstacle.js';
 import Token from './Token.js';
 import PowerUp from './PowerUp.js';
 import ObjectPool from './ObjectPool.js';
+import ScrollingSprite from './ScrollingSprite.js';
 // Import the Shield class at the top of the file
 import Shield from './Shield.js';
 
-const canvas = document.getElementById('gameCanvas');
 
-const ctx = canvas.getContext('2d');
 let lastTime = 0; // store the last time the game loop was run
 let deltaTime = 0; // store the time since the last game loop run
 
@@ -48,40 +47,15 @@ const GameState = {
 };
 let gameState = GameState.PLAYING;
 
-let llama = new Llama(canvas.width / 2, canvas.height / 2, 62.5, 90.75, canvas);
+let llama;
+let backgroundArray = [];
+var canvas;
 
-window.addEventListener('resize', () => {
-  setCanvasSize();
-});
+var ctx;
 
-function setCanvasSize() {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-  const aspectRatio = width / height;
 
-  if (aspectRatio > 1) {
-    // Landscape or wide screens
-    canvas.width = 600;
-    canvas.height = 400;
-  } else {
-    // Portrait or narrow screens
-    canvas.width = width < 768 ? width : 400;
-    canvas.height = height < 768 ? height : height;
-  }
-
-  if (width >= 768 && height >= 600) {
-    canvas.height = 600;
-  }
-
-  // Update the llama's position
-  if (llama) {
-    llama.x = (canvas.width / 2) - (llama.width / 2);
-    //llama.y = (canvas.height / 2) - (llama.height / 2);
-  }
-}
-setCanvasSize();
 // Create a shield instance after creating the llama instance
-let shield = new Shield(0, 0, 50, canvas);
+let shield;
 
 let obstacles = [];
 let knowledgeTokens = [];
@@ -94,6 +68,114 @@ let startTime = 0;
 
 let gameOverTime = 0;
 
+window.onload = () => {
+  init();
+  const backgroundImage = new Image();
+  backgroundImage.src = '/assets/notepad-background-01.png';
+  backgroundImage.position = { x: 0, y: 0 }
+
+  const backgroundSprite = new ScrollingSprite(backgroundImage, 0, 0, canvas.width, canvas.height, 1);
+  const backgroundSprite2 = new ScrollingSprite(backgroundImage, -canvas.width, 0, canvas.width, canvas.height, 1);
+  /*
+  const backgroundImage2 = new Image();
+  backgroundImage2.src = './assets/background_2.png';
+
+  const backgroundBuildingsSprite = new ScrollingSprite(backgroundImage2, 0, 0, canvas.width, canvas.height, 1);
+  const backgroundBuildingsSprite2 = new ScrollingSprite(backgroundImage2, -canvas.width, 0, canvas.width, canvas.height);
+
+  const bridgeImage = new Image();
+  bridgeImage.src = './assets/background_3.png';
+
+  const middleSprite = new ScrollingSprite(bridgeImage, 0, 0, canvas.width, canvas.height, 1.25);
+  const middleSprite2 = new ScrollingSprite(bridgeImage, -canvas.width, 0, canvas.width, canvas.height, 1.25);
+
+  const foregroundBuildingImage = new Image();
+  foregroundBuildingImage.src = './assets/background_4.png';
+
+  const foregroundBuildingSprite = new ScrollingSprite(foregroundBuildingImage, 0, 0, canvas.width, canvas.height, 1.5);
+  const foregroundBuildingSprite2 = new ScrollingSprite(foregroundBuildingImage, -canvas.width, 0, canvas.width, canvas.height, 1.5);
+*/
+  backgroundArray = [
+    backgroundSprite,
+    backgroundSprite2
+  ];
+
+};
+
+function init() {
+
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas, false);
+  window.addEventListener('orientationchange', resizeCanvas, false);
+  canvas.addEventListener('click', handleCanvasClick);
+  canvas.addEventListener('touchstart', handleCanvasClick);
+  canvas.addEventListener('click', () => {
+    if (gameState === GameState.GAME_OVER && canRestart) {
+      gameState = GameState.PLAYING;
+      resetGame();
+      canRestart = false; // Reset the canRestart flag
+      //requestAnimationFrame(gameLoop);
+
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    togglePause();
+  });
+
+  // Add event listeners for the input
+  window.addEventListener('mousedown', () => {
+
+    llama.setInputHeld(true);
+  });
+  window.addEventListener('mouseup', () => {
+    llama.setInputHeld(false);
+    llama.jump();
+  });
+
+  // Add event listeners for mobile input (touch events)
+  window.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevent the default behavior (e.g., scrolling)
+    llama.jump();
+    llama.setInputHeld(true);
+  });
+  window.addEventListener('touchend', (e) => {
+    e.preventDefault(); // Prevent the default behavior (e.g., scrolling)
+    llama.setInputHeld(false);
+  });
+
+
+  //llama = new Llama(canvas.width / 2, canvas.height / 2, 62.5, 90.75, canvas);
+  shield = new Shield(0, 0, 50, canvas);
+}
+
+function resizeCanvas() {
+  var gameArea = document.getElementById('gameArea');
+  var widthToHeight = 9 / 16;
+  var newWidth = window.innerWidth;
+  var newHeight = window.innerHeight;
+  var newWidthToHeight = newWidth / newHeight;
+
+  if (newWidthToHeight > widthToHeight) {
+    newWidth = newHeight * widthToHeight;
+    gameArea.style.height = newHeight + 'px';
+    gameArea.style.width = newWidth + 'px';
+  } else {
+    newHeight = newWidth / widthToHeight;
+    gameArea.style.width = newWidth + 'px';
+    gameArea.style.height = newHeight + 'px';
+  }
+
+  gameArea.style.marginTop = (-newHeight / 2) + 'px';
+  gameArea.style.marginLeft = (-newWidth / 2) + 'px';
+
+  var gameCanvas = document.getElementById('gameCanvas');
+  gameCanvas.width = newWidth;
+  gameCanvas.height = newHeight;
+  canvas = gameCanvas;
+  ctx = canvas.getContext('2d');
+  initPlayer();
+}
 function gameLoop(currentTime) {
   if (gameState === GameState.PAUSED) {
     lastTime = currentTime; // Reset lastTime to avoid a large deltaTime value
@@ -127,7 +209,9 @@ function gameLoop(currentTime) {
 
 requestAnimationFrame(gameLoop);
 function draw() {
+  ctx.imageSmoothingEnabled = true;
 
+  drawParallaxLayers();
   drawLlama();
   drawObstacles();
   drawKnowledgeTokens();
@@ -154,10 +238,9 @@ function update(deltaTime) {
   updateObstacles(deltaTime);
   updateKnowledgeTokens(deltaTime);
   updatePowerUps(deltaTime);
-  // Add the lines below
   attractObjects(knowledgeTokens, deltaTime);
   attractObjects(powerUps, deltaTime);
-  updateScore();
+  updateScore(deltaTime);
   checkCollisions();
   updateShield(deltaTime, llama);
   // update the difficulty based on the elapsed time
@@ -191,6 +274,15 @@ function update(deltaTime) {
   }
 
 }
+
+function drawParallaxLayers() {
+  backgroundArray.forEach(sprite => {
+    sprite.scroll();
+    sprite.draw(ctx);
+  });
+}
+
+
 
 function attractObjects(objects, deltaTime) {
   objects.forEach((obj) => {
@@ -260,12 +352,17 @@ function clearObjects() {
 
   objectPool.reset();
 }
-function resetGame(currentTime) {
+function initPlayer() {
 
+  llama = new Llama(canvas.width / 2, canvas.height / 2, 76.5, 106, canvas);
   // Reset the llama's position and velocity
   llama.x = (canvas.width / 2) - (llama.width / 2);
   llama.y = canvas.height / 2;
   llama.velocityY = 0;
+}
+function resetGame(currentTime) {
+
+  initPlayer();
   clearObjects();
 
   spawnTimer = 0;
@@ -296,8 +393,8 @@ function updateObstacles(deltaTime) {
 
       obstacle.x = canvas.width;
       obstacle.y = Math.random() * (canvas.height - 50)
-      obstacle.width = 307;
-      obstacle.height = 41;
+      obstacle.width = 156;
+      obstacle.height = 106;
       obstacle.speed = obstacleSpeed;
       obstacles.push(obstacle);
     }
@@ -474,25 +571,20 @@ function updateHighScore(newScore) {
   }
 }
 
-function updateScore() {
+function updateScore(deltaTime) {
   // Increment the score based on elapsed time (e.g., every second)
   if (doublePointsActive) {
-    score += 0.2;
+    score += 10 * deltaTime;
   } else {
-    score += 0.1;
+    score += 5 * deltaTime;
   }
 
 }
 
-document.addEventListener('visibilitychange', () => {
-  togglePause();
-});
 
-canvas.addEventListener('mousedown', jump);
-canvas.addEventListener('touchstart', jump);
 
-canvas.addEventListener('click', handleCanvasClick);
-canvas.addEventListener('touchstart', handleCanvasClick);
+
+
 
 function handleCanvasClick() {
   if (gameState === GameState.GAME_OVER && canRestart) {
@@ -536,7 +628,7 @@ function showGameOverScreen() {
 
   setTimeout(() => {
     canRestart = true;
-  }, 1500);
+  }, 15000);
 
 
 }
@@ -544,12 +636,3 @@ function showGameOverScreen() {
 
 
 
-canvas.addEventListener('click', () => {
-  if (gameState === GameState.GAME_OVER && canRestart) {
-    gameState = GameState.PLAYING;
-    resetGame();
-    canRestart = false; // Reset the canRestart flag
-    //requestAnimationFrame(gameLoop);
-
-  }
-});

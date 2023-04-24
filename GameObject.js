@@ -6,7 +6,7 @@ export default class GameObject {
     this.height = height;
   }
 
-  update() {
+  update(deltaTime) {
     // Implement this method in child classes to define the update logic
   }
 
@@ -15,7 +15,7 @@ export default class GameObject {
   }
 
   collidesWith(other) {
-    const leniency = 15; // You can adjust this value to increase or decrease the leniency
+    const leniency = 30; // You can adjust this value to increase or decrease the leniency
 
     // Reduce the width and height of both objects for collision checks
     const thisWidth = this.width - leniency;
