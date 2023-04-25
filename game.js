@@ -28,7 +28,7 @@ const DIFFICULTY_MODIFIER = 2;
 let slowTimeActive = false;
 let slowTimeTimer = 0;
 const SLOW_TIME_DURATION = 5; // 5 seconds
-const SLOW_TIME_FACTOR = 0.5; // 50% speed reduction
+
 
 let doublePointsActive = false;
 let doublePointsTimer = 0;
@@ -146,7 +146,7 @@ function init() {
 
 
   //llama = new Llama(canvas.width / 2, canvas.height / 2, 62.5, 90.75, canvas);
-  shield = new Shield(0, 0, 50, canvas);
+  shield = new Shield(0, 0, 60, canvas);
 }
 
 function resizeCanvas() {
@@ -199,7 +199,7 @@ function gameLoop(currentTime) {
   if (gameState === GameState.GAME_OVER) {
     clearObjects();
     gameOverTime = currentTime; // Set the game over time
-    showGameOverScreen();
+    showGameOverScreen(deltaTime);
     console.log(gameState + ' ' + gameDifficulty);
   }
 
@@ -371,16 +371,21 @@ function resetGame(currentTime) {
   spawnRate = 1;
   // Reset the score
   score = 0;
+  slowTimeActive = false;
+  slowTimeTimer = 0;
 
+  doublePointsActive = false;
+  doublePointsTimer = 0;
+
+  magnetActive = false;
+
+  magnetTimer = 0;
   lastTime = currentTime; // store the last time the game loop was run
   deltaTime = 0; // store the time since the last game loop run
   timeSinceLastDifficultyIncrease = 0;
 
 }
-
 function updateObstacles(deltaTime) {
-
-
   // spawn new obstacles based on spawn rate
   spawnTimer += deltaTime;
   if (spawnTimer >= SPAWN_INTERVAL) {
@@ -396,20 +401,27 @@ function updateObstacles(deltaTime) {
       obstacle.width = 156;
       obstacle.height = 106;
       obstacle.speed = obstacleSpeed;
+      obstacle.setCollider(40);
       obstacles.push(obstacle);
     }
   }
 
   // update the position of each obstacle
   obstacles.forEach((obstacle) => {
-    const speedFactor = slowTimeActive ? SLOW_TIME_FACTOR : 1;
-    obstacle.x -= obstacle.speed * deltaTime * speedFactor;
+    obstacle.update(slowTimeActive, deltaTime);
   });
 
-  // remove obstacles that have gone off the screen
   obstacles = obstacles.filter((obstacle) => {
     if (obstacle.x + obstacle.width <= 0) {
-      objectPool.release(obstacle);
+      const obstacleSpeed = BASE_OBSTACLE_SPEED + gameDifficulty * BASE_OBSTACLE_SPEED;
+
+      var x = canvas.width;
+      var y = Math.random() * (canvas.height - 50)
+      var width = 10006;
+      var height = 5000;
+      var speed = obstacleSpeed;
+      objectPool.release(obstacle, x, y, width, height, speed);
+      obstacle.setCollider(40);
       return false;
     }
     return true;
@@ -417,6 +429,8 @@ function updateObstacles(deltaTime) {
 
 
 }
+
+
 
 function updateShield(deltaTime, llama) {
   shield.update(deltaTime, llama);
@@ -436,7 +450,7 @@ function updateDifficulty(deltaTime) {
 
 function drawObstacles() {
 
-  obstacles.forEach((obstacle) => obstacle.draw(ctx));
+  obstacles.forEach((obstacle) => obstacle.draw(ctx, true));
 }
 function getObstacleSpawnProbability(deltaTime) {
   const baseSpawnProbability = 5; // Increase this value
@@ -451,14 +465,14 @@ function updateKnowledgeTokens(deltaTime) {
   if (Math.random() < 0.005) {
     const token = objectPool.get(Token);
     token.x = canvas.width;
-    token.y = Math.random() * (canvas.height - 10);
-    token.width = 50;
-    token.height = 50;
+    token.y = Math.random() * (canvas.height - 75);
+    token.width = 75;
+    token.height = 75;
     knowledgeTokens.push(token);
   }
 
   knowledgeTokens = knowledgeTokens.filter((token) => {
-    token.update();
+    token.update(deltaTime);
     if (token.x + token.width <= 0) {
       objectPool.release(token);
       return false;
@@ -474,9 +488,9 @@ function updatePowerUps(deltaTime) {
   if (Math.random() < 0.002) {
     const powerUp = objectPool.get(PowerUp);
     powerUp.x = canvas.width;
-    powerUp.y = Math.random() * (canvas.height - 20);
-    powerUp.width = 50;
-    powerUp.height = 50;
+    powerUp.y = Math.random() * (canvas.height - 75);
+    powerUp.width = 75;
+    powerUp.height = 75;
 
     const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
     powerUp.setType(randomType);
@@ -485,9 +499,8 @@ function updatePowerUps(deltaTime) {
   }
 
   powerUps = powerUps.filter((powerUp) => {
-    const speedFactor = slowTimeActive ? SLOW_TIME_FACTOR : 1;
-    powerUp.x -= powerUp.speed * speedFactor;
-    powerUp.update();
+
+    powerUp.update(slowTimeActive, deltaTime);
     if (powerUp.x + powerUp.width <= 0) {
       objectPool.release(powerUp);
       return false;
@@ -582,10 +595,6 @@ function updateScore(deltaTime) {
 }
 
 
-
-
-
-
 function handleCanvasClick() {
   if (gameState === GameState.GAME_OVER && canRestart) {
     gameState = GameState.PLAYING;
@@ -601,7 +610,7 @@ function jump(event) {
   }
 }
 
-function showGameOverScreen() {
+function showGameOverScreen(deltaTime) {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -628,7 +637,7 @@ function showGameOverScreen() {
 
   setTimeout(() => {
     canRestart = true;
-  }, 15000);
+  }, 15000 * deltaTime);
 
 
 }

@@ -4,10 +4,11 @@ import PowerUp from './PowerUp.js';
 
 export default class ObjectPool {
   constructor() {
-    this.pool = new Map(); // Initialize the pool property
+    this.pool = new Map();
     this.pool.set(Obstacle, []);
     this.pool.set(Token, []);
     this.pool.set(PowerUp, []);
+    this.maxSize = 50; // Set the maximum size for each pool
   }
 
   get(cls, ...args) {
@@ -20,17 +21,18 @@ export default class ObjectPool {
     return obj;
   }
 
-  release(obj) {
 
-    if (obj instanceof Obstacle) {
-      obj.reset();
-    } else if (obj instanceof Token) {
-      obj.reset();
-    } else if (obj instanceof PowerUp) {
-      obj.reset();
+  release(obj, ...params) {
+    if (this.pool.has(obj.constructor)) {
+      if (this.pool.get(obj.constructor).length < this.maxSize) {
+        if (typeof obj.reset === 'function') {
+          obj.reset(...params);
+        }
+        this.pool.get(obj.constructor).push(obj);
+      }
+    } else {
+      throw new Error('Invalid object provided');
     }
-    this.pool.get(obj.constructor).push(obj);
-
   }
 
 

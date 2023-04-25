@@ -3,9 +3,9 @@ import GameObject from './GameObject.js';
 export default class PowerUp extends GameObject {
   constructor(x, y, width, height) {
     super(x, y, width, height);
-    this.speed = 1;
+    this.speed = 100;
     this.type = '';
-
+    this.SLOW_TIME_FACTOR = 0.5;
     this.images = {
       slow_time: new Image(),
       double_points: new Image(),
@@ -14,11 +14,11 @@ export default class PowerUp extends GameObject {
       default: new Image(),
     };
 
-    this.images.slow_time.src = './slow-time.png';
-    this.images.double_points.src = './double-points.png';
-    this.images.shield.src = './shield.png';
-    this.images.default.src = './double-points.png';
-    this.images.magnet.src = './magnet.png';
+    this.images.slow_time.src = './assets/slow_time.png';
+    this.images.double_points.src = './assets/double_points.png';
+    this.images.shield.src = './assets/shield.png';
+    this.images.default.src = './assets/magnet.png';
+    this.images.magnet.src = './assets/magnet.png';
 
   }
 
@@ -30,8 +30,9 @@ export default class PowerUp extends GameObject {
     });
   }
 
-  update() {
-    this.x -= this.speed;
+  update(slowTimeActive, deltaTime) {
+    const speedFactor = slowTimeActive ? this.SLOW_TIME_FACTOR : 1;
+    this.x -= (this.speed * deltaTime) * speedFactor;
   }
 
   draw(ctx) {
